@@ -1,0 +1,11 @@
+build:
+  maxIssues: 0
+
+style:
+  MagicNumber:
+    active: false
+
+complexity:
+  LongMethod:
+    active: true
+    threshold: 80

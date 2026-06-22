@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="seed">#1F6F78</color>
+
+    <color name="home_background">#F4FBF8</color>
+    <color name="home_card">#FFFFFF</color>
+    <color name="home_outline">#D8ECE4</color>
+    <color name="home_text_primary">#12342C</color>
+    <color name="home_text_secondary">#5F8B7E</color>
+    <color name="home_accent">#167A62</color>
+
+    <color name="network_banner_bg">#FEECEA</color>
+    <color name="network_banner_text">#A5423A</color>
+
+    <color name="platform_selected_bg">#DFF6EC</color>
+    <color name="platform_selected_stroke">#2FA877</color>
+</resources>

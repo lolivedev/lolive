@@ -1,0 +1,41 @@
+# Gradle / build output
+.gradle/
+build/
+**/build/
+
+# Local SDK and environment files
+local.properties
+.android-user-home/
+.gradle-user-home/
+.user-home/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Packaging artifacts
+*.apk
+*.aab
+*.ap_
+output-metadata.json
+*.so
+
+# Signing / secrets
+*.jks
+*.keystore
+*.jks.base64.txt
+*.keystore.base64.txt
+google-services.json
+
+# Logs / profiling / OS junk
+*.log
+*.hprof
+.DS_Store
+Thumbs.db
+
+.claude
+
+CLAUDE.md
