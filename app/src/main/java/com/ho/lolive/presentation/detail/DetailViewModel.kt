@@ -10,6 +10,7 @@ import com.ho.lolive.domain.usecase.GetAdjacentRoomUseCase
 import com.ho.lolive.domain.usecase.GetRoomDetailUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,7 @@ class DetailViewModel @Inject constructor(
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
     private var retryCount = 0
+    private var loadRoomJob: Job? = null
 
     companion object {
         private const val MAX_RETRY_COUNT = 5
@@ -91,7 +93,9 @@ class DetailViewModel @Inject constructor(
     }
 
     private fun loadRoom(roomId: String) {
-        viewModelScope.launch {
+        // Cancel any in-flight load so a late-arriving result cannot overwrite the newest selection.
+        loadRoomJob?.cancel()
+        loadRoomJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     loading = true,

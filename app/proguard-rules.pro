@@ -5,17 +5,45 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# --- General ---
+-keepattributes RuntimeVisibleAnnotations, AnnotationDefault, Signature, InnerClasses, EnclosingMethod, Exceptions, SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# --- kotlinx.serialization ---
+-dontnote kotlinx.serialization.**
+-keep,includedescriptorclasses class com.ho.lolive.**$$serializer { *; }
+-keepclassmembers class com.ho.lolive.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.ho.lolive.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep DTOs used by Retrofit + kotlinx.serialization.
+-keep class com.ho.lolive.data.remote.dto.** { *; }
+
+# --- Retrofit / OkHttp ---
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+# --- Room ---
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep @androidx.room.Entity class * { *; }
+-dontwarn androidx.room.paging.**
+
+# --- Hilt / Dagger ---
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+
+# --- Native bridge ---
+# JNI exported function names (Java_com_ho_lolive_core_nativebridge_NativeEndpointBridge_*)
+# are derived from the fully-qualified Java class and method names, so neither can be renamed.
+-keep class com.ho.lolive.core.nativebridge.NativeEndpointBridge { *; }
+
+# --- Compose ---
+-dontwarn androidx.compose.**
+
+# --- BuildConfig ---
+-keep class com.ho.lolive.BuildConfig { *; }

@@ -82,4 +82,7 @@ private class FakeLiveRepository(
     override suspend fun getPreviousRoomId(roomId: String): String? = null
 
     override suspend fun getNextRoomId(roomId: String): String? = null
+
+    override suspend fun getLatestRelease(): AppResult<AppUpdateInfo> =
+        AppResult.Error(Throwable("missing"))
 }

@@ -13,7 +13,8 @@ interface LiveRoomDao {
     @Query(
         """
         SELECT * FROM live_rooms
-        WHERE title LIKE '%' || :query || '%' OR platformTitle LIKE '%' || :query || '%'
+        WHERE title LIKE '%' || :query || '%' ESCAPE '\'
+           OR platformTitle LIKE '%' || :query || '%' ESCAPE '\'
         ORDER BY updatedAt DESC
         """,
     )
@@ -22,12 +23,12 @@ interface LiveRoomDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(rooms: List<LiveRoomEntity>)
 
-    @Query("DELETE FROM live_rooms")
-    suspend fun clearAll()
+    @Query("DELETE FROM live_rooms WHERE platformTitle = :platformTitle")
+    suspend fun clearByPlatform(platformTitle: String)
 
     @Transaction
-    suspend fun replaceAll(rooms: List<LiveRoomEntity>) {
-        clearAll()
+    suspend fun replacePlatformRooms(platformTitle: String, rooms: List<LiveRoomEntity>) {
+        clearByPlatform(platformTitle)
         insertAll(rooms)
     }
 
@@ -37,17 +38,40 @@ interface LiveRoomDao {
     @Query(
         """
         SELECT id FROM live_rooms
+        WHERE platformTitle = :platformTitle AND updatedAt < :currentUpdatedAt
         ORDER BY updatedAt DESC, title COLLATE NOCASE ASC
+        LIMIT 1
         """,
     )
-    suspend fun orderedRoomIds(): List<String>
+    suspend fun findPreviousRoomId(platformTitle: String, currentUpdatedAt: Long): String?
+
+    @Query(
+        """
+        SELECT id FROM live_rooms
+        WHERE platformTitle = :platformTitle AND updatedAt > :currentUpdatedAt
+        ORDER BY updatedAt ASC, title COLLATE NOCASE ASC
+        LIMIT 1
+        """,
+    )
+    suspend fun findNextRoomId(platformTitle: String, currentUpdatedAt: Long): String?
+
+    @Query(
+        """
+        SELECT id FROM live_rooms
+        WHERE platformTitle = :platformTitle
+        ORDER BY updatedAt ASC, title COLLATE NOCASE ASC
+        LIMIT 1
+        """,
+    )
+    suspend fun findOldestRoomId(platformTitle: String): String?
 
     @Query(
         """
         SELECT id FROM live_rooms
         WHERE platformTitle = :platformTitle
         ORDER BY updatedAt DESC, title COLLATE NOCASE ASC
+        LIMIT 1
         """,
     )
-    suspend fun orderedRoomIdsByPlatform(platformTitle: String): List<String>
+    suspend fun findNewestRoomId(platformTitle: String): String?
 }

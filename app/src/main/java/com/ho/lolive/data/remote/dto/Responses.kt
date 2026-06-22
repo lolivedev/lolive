@@ -12,13 +12,13 @@ data class PlatformListResponse(
 @Serializable
 data class PlatformDto(
     @SerialName("address")
-    val address: String,
+    val address: String = "",
     @SerialName("xinimg")
-    val iconUrl: String,
+    val iconUrl: String = "",
     @SerialName("Number")
-    val onlineCount: String,
+    val onlineCount: String = "",
     @SerialName("title")
-    val title: String,
+    val title: String = "",
 )
 
 @Serializable
@@ -30,9 +30,9 @@ data class LiveRoomListResponse(
 @Serializable
 data class AnchorDto(
     @SerialName("address")
-    val streamUrl: String,
+    val streamUrl: String = "",
     @SerialName("img")
-    val coverUrl: String,
+    val coverUrl: String = "",
     @SerialName("title")
-    val title: String,
+    val title: String = "",
 )

@@ -1,50 +1,36 @@
 package com.ho.lolive.domain.usecase
 
 import com.ho.lolive.core.common.AppResult
-import com.ho.lolive.data.remote.GithubApiService
 import com.ho.lolive.domain.model.AppUpdateInfo
+import com.ho.lolive.domain.repository.LiveRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 
 class CheckAppUpdateUseCase @Inject constructor(
-    private val githubApiService: GithubApiService,
+    private val repository: LiveRepository,
 ) {
     suspend operator fun invoke(
         currentVersionName: String,
         currentVersionCode: Int,
     ): AppResult<AppUpdateInfo?> {
         return try {
-            val release = githubApiService.getLatestRelease(LATEST_RELEASE_URL)
-            val latest = release.toUpdateInfo()
-            val hasUpdate = isLatestNewer(
-                latest = latest,
-                currentVersionName = currentVersionName,
-                currentVersionCode = currentVersionCode,
-            )
-            AppResult.Success(if (hasUpdate) latest else null)
+            when (val result = repository.getLatestRelease()) {
+                is AppResult.Success -> {
+                    val latest = result.data
+                    val hasUpdate = isLatestNewer(
+                        latest = latest,
+                        currentVersionName = currentVersionName,
+                        currentVersionCode = currentVersionCode,
+                    )
+                    AppResult.Success(if (hasUpdate) latest else null)
+                }
+                is AppResult.Error -> AppResult.Error(result.throwable, result.message)
+                AppResult.Loading -> AppResult.Loading
+            }
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             AppResult.Error(throwable)
         }
-    }
-
-    private fun com.ho.lolive.data.remote.dto.GithubReleaseResponse.toUpdateInfo(): AppUpdateInfo {
-        val normalizedTag = tagName.trim()
-        val versionName = normalizedTag
-            .removePrefix("v")
-            .substringBefore("-build.")
-            .ifBlank { normalizedTag.removePrefix("v") }
-            .ifBlank { "latest" }
-        val versionCode = Regex("""-build\.(\d+)$""")
-            .find(normalizedTag)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.toIntOrNull()
-        return AppUpdateInfo(
-            versionName = versionName,
-            versionCode = versionCode,
-            releaseUrl = htmlUrl.ifBlank { DEFAULT_RELEASE_WEB_URL },
-        )
     }
 
     private fun isLatestNewer(
@@ -61,8 +47,8 @@ class CheckAppUpdateUseCase @Inject constructor(
     }
 
     private fun compareVersionName(left: String, right: String): Int {
-        val leftParts = Regex("""\d+""").findAll(left).map { it.value.toInt() }.toList()
-        val rightParts = Regex("""\d+""").findAll(right).map { it.value.toInt() }.toList()
+        val leftParts = extractVersionNumbers(left)
+        val rightParts = extractVersionNumbers(right)
 
         // If neither version contains digits, fall back to string comparison
         if (leftParts.isEmpty() && rightParts.isEmpty()) {
@@ -79,10 +65,10 @@ class CheckAppUpdateUseCase @Inject constructor(
         return 0
     }
 
-    companion object {
-        private const val LATEST_RELEASE_URL =
-            "https://api.github.com/repos/lolivedev/lolive/releases/latest"
-        private const val DEFAULT_RELEASE_WEB_URL =
-            "https://github.com/lolivedev/lolive/releases/latest"
+    private fun extractVersionNumbers(version: String): List<Int> {
+        // Strip pre-release/build suffixes so e.g. "1.21-beta.3" only yields [1, 21] and does not
+        // treat the trailing beta number as a version segment.
+        val core = version.substringBefore('-').substringBefore('+')
+        return Regex("""\d+""").findAll(core).map { it.value.toInt() }.toList()
     }
 }

@@ -1,4 +1,4 @@
-﻿package com.ho.lolive.presentation.home
+package com.ho.lolive.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -43,7 +43,7 @@ class HomeViewModel @Inject constructor(
 
     private val queryState = MutableStateFlow("")
     private var platformsLoadJob: Job? = null
-    private val isRefreshing = MutableStateFlow(false)
+    private var refreshJob: Job? = null
 
     val pagedRooms = queryState
         .debounce(350)
@@ -152,11 +152,10 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun loadRoomsForPlatform(platform: LivePlatform) {
-        viewModelScope.launch {
-            // Use compare-and-set to prevent concurrent refreshes
-            if (!isRefreshing.compareAndSet(expect = false, update = true)) {
-                return@launch
-            }
+        // Cancel any in-flight refresh (e.g. for a different platform) so switching platforms is
+        // never silently dropped by a stale in-progress request.
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             _uiState.update { it.copy(isRefreshingRooms = true, errorMessage = null) }
             try {
                 val result = withContext(Dispatchers.IO) {
@@ -171,9 +170,19 @@ class HomeViewModel @Inject constructor(
                     }
                     AppResult.Loading -> Unit
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } finally {
-                _uiState.update { it.copy(isRefreshingRooms = false) }
-                isRefreshing.value = false
+                // Only clear the refreshing flag when this launch is still the active refresh for
+                // the currently selected platform; otherwise a superseded launch would clobber the
+                // spinner of the newer one.
+                _uiState.update { state ->
+                    if (state.selectedPlatformAddress == platform.address) {
+                        state.copy(isRefreshingRooms = false)
+                    } else {
+                        state
+                    }
+                }
             }
         }
     }

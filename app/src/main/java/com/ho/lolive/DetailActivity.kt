@@ -88,6 +88,7 @@ class DetailActivity : ComponentActivity() {
     private var gestureStartX = 0f
     private var gestureStartY = 0f
     private var gestureStartVolume = 0
+    private var lastAppliedStreamVolume = 0
     private var currentBrightness = 0.5f
     private var gestureStartBrightness = 0.5f
     private var switchedInCurrentGesture = false
@@ -184,6 +185,7 @@ class DetailActivity : ComponentActivity() {
                     gestureStartX = event.x
                     gestureStartY = event.y
                     gestureStartVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    lastAppliedStreamVolume = gestureStartVolume
                     verticalAdjustSide = if (event.x < playerView.width / 2f) {
                         VerticalAdjustSide.LEFT_BRIGHTNESS
                     } else {
@@ -249,9 +251,10 @@ class DetailActivity : ComponentActivity() {
                                     val targetVolume = (gestureStartVolume + ratio * maxStreamVolume)
                                         .roundToInt()
                                         .coerceIn(0, maxStreamVolume)
-                                    val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                                    if (targetVolume != currentVolume) {
+                                    // Avoid a per-move IPC to read the current volume; track it locally.
+                                    if (targetVolume != lastAppliedStreamVolume) {
                                         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+                                        lastAppliedStreamVolume = targetVolume
                                     }
                                     val volumePercent = (targetVolume * 100f / maxStreamVolume).roundToInt()
                                     showGestureHint(getString(R.string.volume_percent, volumePercent))
@@ -511,6 +514,10 @@ class DetailActivity : ComponentActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         WindowCompat.getInsetsController(window, window.decorView)
             .show(WindowInsetsCompat.Type.systemBars())
+        // Restore system brightness that may have been changed by the brightness gesture.
+        window.attributes = window.attributes.apply {
+            screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
     }

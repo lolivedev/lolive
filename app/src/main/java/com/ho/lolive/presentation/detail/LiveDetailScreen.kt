@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -158,10 +160,11 @@ fun LiveDetailScreen(
     Scaffold(
         containerColor = Color(0xFFF3FAF7),
     ) { paddingValues ->
+        val contentPadding = if (isFullscreen) PaddingValues(0.dp) else paddingValues
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(contentPadding)
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(Color(0xFFEFFCF7), Color(0xFFDFF6F2), Color(0xFFF4FAF8)),
@@ -249,6 +252,8 @@ private fun RoomPlayer(
             .coerceIn(0f, 1f)
     }
 
+    val horizontalSwitchThresholdPx = with(LocalDensity.current) { 120.dp.toPx() }
+
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = Player.REPEAT_MODE_OFF
@@ -268,11 +273,23 @@ private fun RoomPlayer(
     var fullscreenMenuExpanded by remember { mutableStateOf(false) }
     var infoDialogVisible by remember { mutableStateOf(false) }
     var shouldResumeOnStart by remember { mutableStateOf(false) }
+    var pendingStreamVolume by remember { mutableStateOf(-1) }
 
     var currentBrightness by remember {
         mutableFloatStateOf(
             ((activity?.window?.attributes?.screenBrightness ?: -1f).takeIf { it > 0f } ?: 0.5f),
         )
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            // Restore system brightness that may have been changed by the brightness gesture.
+            activity?.window?.let { window ->
+                window.attributes = window.attributes.apply {
+                    screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                }
+            }
+        }
     }
 
     var resolutionOptions by remember { mutableStateOf<List<ResolutionOption>>(emptyList()) }
@@ -411,8 +428,8 @@ private fun RoomPlayer(
                     },
                     onDragEnd = {
                         when {
-                            dragDistanceX < -120f && canPlayPrevious -> onPlayPrevious()
-                            dragDistanceX > 120f && canPlayNext -> onPlayNext()
+                            dragDistanceX < -horizontalSwitchThresholdPx && canPlayNext -> onPlayNext()
+                            dragDistanceX > horizontalSwitchThresholdPx && canPlayPrevious -> onPlayPrevious()
                         }
                         dragDistanceX = 0f
                         controlsVisible = true
@@ -445,10 +462,10 @@ private fun RoomPlayer(
                                 playerVolume = (playerVolume + factor * 2f).coerceIn(0f, 1f)
                                 exoPlayer.volume = playerVolume
                                 isMuted = playerVolume <= 0.001f
-                                val streamVolume = (playerVolume * maxStreamVolume)
+                                // Defer the system volume IPC to onDragEnd; player gain updates live.
+                                pendingStreamVolume = (playerVolume * maxStreamVolume)
                                     .roundToInt()
                                     .coerceIn(0, maxStreamVolume)
-                                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, streamVolume, 0)
                                 gestureHint = context.getString(
                                     R.string.volume_percent,
                                     (playerVolume * 100).roundToInt(),
@@ -460,8 +477,20 @@ private fun RoomPlayer(
                         controlsVisible = true
                         change.consume()
                     },
-                    onDragEnd = { currentGestureSide = null },
-                    onDragCancel = { currentGestureSide = null },
+                    onDragEnd = {
+                        if (pendingStreamVolume >= 0) {
+                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, pendingStreamVolume, 0)
+                            pendingStreamVolume = -1
+                        }
+                        currentGestureSide = null
+                    },
+                    onDragCancel = {
+                        if (pendingStreamVolume >= 0) {
+                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, pendingStreamVolume, 0)
+                            pendingStreamVolume = -1
+                        }
+                        currentGestureSide = null
+                    },
                 )
             },
     ) {
@@ -474,7 +503,7 @@ private fun RoomPlayer(
             },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
-                view.player = exoPlayer
+                if (view.player !== exoPlayer) view.player = exoPlayer
             },
         )
 
