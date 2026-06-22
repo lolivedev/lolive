@@ -38,12 +38,3 @@
 -keep class javax.inject.** { *; }
 
 # --- Native bridge ---
-# JNI exported function names (Java_com_ho_lolive_core_nativebridge_NativeEndpointBridge_*)
-# are derived from the fully-qualified Java class and method names, so neither can be renamed.
--keep class com.ho.lolive.core.nativebridge.NativeEndpointBridge { *; }
-
-# --- Compose ---
--dontwarn androidx.compose.**
-
-# --- BuildConfig ---
--keep class com.ho.lolive.BuildConfig { *; }
