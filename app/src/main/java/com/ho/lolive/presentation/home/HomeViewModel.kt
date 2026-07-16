@@ -8,6 +8,8 @@ import com.ho.lolive.BuildConfig
 import com.ho.lolive.core.common.AppResult
 import com.ho.lolive.core.common.Logger
 import com.ho.lolive.core.network.ConnectivityObserver
+import com.ho.lolive.data.local.UpdatePreferences
+import com.ho.lolive.domain.model.AppUpdateInfo
 import com.ho.lolive.domain.model.LivePlatform
 import com.ho.lolive.domain.usecase.CheckAppUpdateUseCase
 import com.ho.lolive.domain.usecase.GetPlatformsUseCase
@@ -39,6 +41,7 @@ class HomeViewModel @Inject constructor(
     private val getPlatformsUseCase: GetPlatformsUseCase,
     private val refreshRoomsUseCase: RefreshRoomsUseCase,
     private val checkAppUpdateUseCase: CheckAppUpdateUseCase,
+    private val updatePreferences: UpdatePreferences,
     connectivityObserver: ConnectivityObserver,
 ) : ViewModel() {
 
@@ -49,6 +52,7 @@ class HomeViewModel @Inject constructor(
     private val selectedPlatformTitle = MutableStateFlow<String?>(null)
     private var platformsLoadJob: Job? = null
     private var refreshJob: Job? = null
+    private var updateCheckJob: Job? = null
 
     val pagedRooms = combine(
         selectedPlatformTitle,
@@ -89,7 +93,7 @@ class HomeViewModel @Inject constructor(
             }
         }
         loadPlatforms()
-        checkForUpdate()
+        checkForUpdate(fromUser = false)
     }
 
     fun onQueryChanged(newQuery: String) {
@@ -121,8 +125,25 @@ class HomeViewModel @Inject constructor(
         loadPlatforms()
     }
 
-    fun dismissUpdateDialog() {
+    /** 菜单手动触发检查更新。 */
+    fun checkUpdateManually() {
+        checkForUpdate(fromUser = true)
+    }
+
+    /**
+     * @param ignoreVersion true 表示用户选择稍后/关闭，记录后自动检查不再弹该版本；
+     *                      false 表示去更新后仅关闭弹窗，下次启动仍可提醒。
+     */
+    fun dismissUpdateDialog(ignoreVersion: Boolean = false) {
+        val current = _uiState.value.availableUpdate
+        if (ignoreVersion && current != null) {
+            updatePreferences.ignoreVersion(current)
+        }
         _uiState.update { it.copy(availableUpdate = null) }
+    }
+
+    fun consumeUpdateCheckToast() {
+        _uiState.update { it.copy(updateCheckToast = null) }
     }
 
     private fun loadPlatforms() {
@@ -214,26 +235,73 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun checkForUpdate() {
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                checkAppUpdateUseCase(
-                    currentVersionName = BuildConfig.VERSION_NAME,
-                    currentVersionCode = BuildConfig.VERSION_CODE,
-                )
+    private fun checkForUpdate(fromUser: Boolean) {
+        if (updateCheckJob?.isActive == true) {
+            if (!fromUser) return
+            // 用户手动点检查时取消静默任务，立即重新查。
+            updateCheckJob?.cancel()
+        }
+
+        updateCheckJob = viewModelScope.launch {
+            if (fromUser) {
+                _uiState.update {
+                    it.copy(isCheckingUpdate = true, updateCheckToast = null)
+                }
             }
-
-            when (result) {
-                is AppResult.Success -> {
-                    val update = result.data ?: return@launch
-                    _uiState.update { it.copy(availableUpdate = update) }
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    checkAppUpdateUseCase(
+                        currentVersionName = BuildConfig.VERSION_NAME,
+                        currentVersionCode = BuildConfig.VERSION_CODE,
+                    )
                 }
 
-                is AppResult.Error -> {
-                    Logger.e("checkForUpdate failed", result.throwable)
+                when (result) {
+                    is AppResult.Success -> handleUpdateCheckSuccess(result.data, fromUser)
+                    is AppResult.Error -> handleUpdateCheckError(result, fromUser)
+                    AppResult.Loading -> Unit
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                if (fromUser) {
+                    _uiState.update { it.copy(isCheckingUpdate = false) }
+                }
+            }
+        }
+    }
 
-                AppResult.Loading -> Unit
+    private fun handleUpdateCheckSuccess(update: AppUpdateInfo?, fromUser: Boolean) {
+        if (update == null) {
+            if (fromUser) {
+                _uiState.update {
+                    it.copy(
+                        availableUpdate = null,
+                        updateCheckToast = UpdateCheckToast.ALREADY_LATEST,
+                    )
+                }
+            }
+            return
+        }
+
+        // 自动检查：用户已忽略的版本不再弹窗；手动检查仍提示。
+        if (!fromUser && updatePreferences.isVersionIgnored(update)) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                availableUpdate = update,
+                updateCheckToast = null,
+            )
+        }
+    }
+
+    private fun handleUpdateCheckError(result: AppResult.Error, fromUser: Boolean) {
+        Logger.e("checkForUpdate failed", result.throwable)
+        if (fromUser) {
+            _uiState.update {
+                it.copy(updateCheckToast = UpdateCheckToast.CHECK_FAILED)
             }
         }
     }

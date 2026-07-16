@@ -37,6 +37,11 @@
     <string name="update_available_title">Update Available</string>
     <string name="update_available_message">A new version %1$s is available.</string>
     <string name="update_now">Update</string>
+    <string name="update_later">Later</string>
+    <string name="check_update">Check for updates</string>
+    <string name="update_already_latest">You are on the latest version</string>
+    <string name="update_check_failed">Failed to check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
     <string name="loading_rooms">Loading live rooms...</string>
     <string name="platform_meta_format">Online: %1$d - %2$d platforms</string>
     <string name="platform_sheet_count">%1$d / %2$d</string>

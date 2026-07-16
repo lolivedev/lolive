@@ -33,6 +33,7 @@ import com.ho.lolive.domain.model.AppUpdateInfo
 import com.ho.lolive.domain.model.LivePlatform
 import com.ho.lolive.presentation.home.HomeUiState
 import com.ho.lolive.presentation.home.HomeViewModel
+import com.ho.lolive.presentation.home.UpdateCheckToast
 import com.ho.lolive.presentation.xml.PlatformSelectorBottomSheet
 import com.ho.lolive.presentation.xml.RoomPagingAdapter
 import dagger.hilt.android.AndroidEntryPoint
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
     private var latestUpdateInfo: AppUpdateInfo? = null
     private var latestState: HomeUiState = HomeUiState()
     private var lastShownError: String? = null
+    private var updateDialogShowing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -118,12 +120,21 @@ class MainActivity : ComponentActivity() {
     private fun setupActions() {
         toolbar.inflateMenu(R.menu.main_actions)
         toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_refresh) {
-                playRefreshActionAnimation()
-                onPlatformRefreshRequested()
-                true
-            } else {
-                false
+            when (item.itemId) {
+                R.id.action_refresh -> {
+                    playRefreshActionAnimation()
+                    onPlatformRefreshRequested()
+                    true
+                }
+                R.id.action_check_update -> {
+                    if (viewModel.uiState.value.isCheckingUpdate) {
+                        Toast.makeText(this, R.string.update_checking, Toast.LENGTH_SHORT).show()
+                    } else {
+                        viewModel.checkUpdateManually()
+                    }
+                    true
+                }
+                else -> false
             }
         }
 
@@ -198,7 +209,16 @@ class MainActivity : ComponentActivity() {
             lastShownError = null
         }
 
-        if (latestUpdateInfo?.versionName != state.availableUpdate?.versionName) {
+        state.updateCheckToast?.let { toast ->
+            val messageRes = when (toast) {
+                UpdateCheckToast.ALREADY_LATEST -> R.string.update_already_latest
+                UpdateCheckToast.CHECK_FAILED -> R.string.update_check_failed
+            }
+            Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()
+            viewModel.consumeUpdateCheckToast()
+        }
+
+        if (state.availableUpdate != latestUpdateInfo) {
             latestUpdateInfo = state.availableUpdate
             state.availableUpdate?.let { update ->
                 showUpdateDialog(update)
@@ -277,15 +297,26 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showUpdateDialog(update: AppUpdateInfo) {
+        if (updateDialogShowing) return
+        updateDialogShowing = true
         MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.update_available_title))
             .setMessage(getString(R.string.update_available_message, update.versionName))
             .setPositiveButton(getString(R.string.update_now)) { _, _ ->
+                // 去更新：只关弹窗，不忽略版本，下次启动仍可提醒。
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.releaseUrl)))
-                viewModel.dismissUpdateDialog()
+                viewModel.dismissUpdateDialog(ignoreVersion = false)
             }
-            .setNegativeButton(getString(R.string.close)) { _, _ ->
-                viewModel.dismissUpdateDialog()
+            .setNegativeButton(getString(R.string.update_later)) { _, _ ->
+                // 稍后：忽略该版本，避免自动检查反复弹窗。
+                viewModel.dismissUpdateDialog(ignoreVersion = true)
+            }
+            .setOnCancelListener {
+                // 点遮罩/返回：与稍后一致，忽略该版本。
+                viewModel.dismissUpdateDialog(ignoreVersion = true)
+            }
+            .setOnDismissListener {
+                updateDialogShowing = false
             }
             .setCancelable(true)
             .show()
