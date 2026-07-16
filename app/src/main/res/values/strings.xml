@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">lolive</string>
-    <string name="home_title">Fresh Live</string>
+    <string name="app_name">LoLive</string>
+    <string name="home_title">LoLive</string>
     <string name="platform_section_title">Platforms</string>
     <string name="switch_platform">Switch</string>
     <string name="platform_search_hint">Search platform</string>

@@ -32,7 +32,7 @@ class LiveRepositoryImpl @Inject constructor(
     private val liveRoomDao: LiveRoomDao,
 ) : LiveRepository {
 
-    override fun observePagedRooms(query: String): Flow<PagingData<LiveRoom>> {
+    override fun observePagedRooms(platformTitle: String, query: String): Flow<PagingData<LiveRoom>> {
         val escapedQuery = escapeForLikeQuery(query.trim())
         return Pager(
             config = PagingConfig(
@@ -41,7 +41,7 @@ class LiveRepositoryImpl @Inject constructor(
                 prefetchDistance = 3,
                 enablePlaceholders = false,
             ),
-            pagingSourceFactory = { liveRoomDao.pagingSource(escapedQuery) },
+            pagingSourceFactory = { liveRoomDao.pagingSource(platformTitle, escapedQuery) },
         ).flow.map { pagingData ->
             pagingData.map { it.toDomain() }
         }
@@ -77,7 +77,8 @@ class LiveRepositoryImpl @Inject constructor(
                 .mapIndexed { index, anchor ->
                     val rawTitle = anchor.title.trim()
                     val rawStreamUrl = anchor.streamUrl.trim()
-                    val streamKey = rawStreamUrl.ifBlank { rawTitle }
+                    // Drop query/fragment so CDN-signed stream URLs stay stable across refreshes.
+                    val streamKey = stableStreamKey(rawStreamUrl, rawTitle)
                     LiveRoomEntity(
                         id = "${platform.address}_${rawTitle}_${streamKey}",
                         title = rawTitle.decodeDisplayText(),
@@ -119,8 +120,10 @@ class LiveRepositoryImpl @Inject constructor(
         return try {
             val current = liveRoomDao.findById(roomId) ?: return null
             // Cycle to the oldest room when the current one is the newest in the platform.
-            liveRoomDao.findPreviousRoomId(current.platformTitle, current.updatedAt)
+            // If only one room exists, adjacent collapses to self — treat as no neighbor.
+            val adjacent = liveRoomDao.findPreviousRoomId(current.platformTitle, current.updatedAt)
                 ?: liveRoomDao.findOldestRoomId(current.platformTitle)
+            adjacent?.takeIf { it != roomId }
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             Logger.e("getPreviousRoomId failed", throwable)
@@ -132,8 +135,9 @@ class LiveRepositoryImpl @Inject constructor(
         return try {
             val current = liveRoomDao.findById(roomId) ?: return null
             // Cycle to the newest room when the current one is the oldest in the platform.
-            liveRoomDao.findNextRoomId(current.platformTitle, current.updatedAt)
+            val adjacent = liveRoomDao.findNextRoomId(current.platformTitle, current.updatedAt)
                 ?: liveRoomDao.findNewestRoomId(current.platformTitle)
+            adjacent?.takeIf { it != roomId }
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             Logger.e("getNextRoomId failed", throwable)
@@ -199,6 +203,12 @@ class LiveRepositoryImpl @Inject constructor(
 
     private fun normalizePlatformTitle(title: String): String {
         return title.trim().replace(WHITESPACE_REGEX, "")
+    }
+
+    private fun stableStreamKey(rawStreamUrl: String, rawTitle: String): String {
+        val value = rawStreamUrl.trim()
+        if (value.isEmpty()) return rawTitle
+        return value.substringBefore('?').substringBefore('#')
     }
 
     private fun escapeForLikeQuery(query: String): String {

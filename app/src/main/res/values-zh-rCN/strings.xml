@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">好直播</string>
-    <string name="home_title">清新直播</string>
+    <string name="app_name">LoLive</string>
+    <string name="home_title">LoLive</string>
     <string name="platform_section_title">平台</string>
     <string name="switch_platform">切换</string>
     <string name="platform_search_hint">搜索平台</string>

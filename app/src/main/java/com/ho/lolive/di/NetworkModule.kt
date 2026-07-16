@@ -117,11 +117,15 @@ object NetworkModule {
     ): Response {
         val response = chain.proceed(request)
         val body = response.body ?: return response
-        val encoding = response.header("Content-Encoding")?.trim()?.lowercase() ?: return response
+        val encoding = response.header("Content-Encoding")?.trim()?.lowercase()
+        if (encoding.isNullOrEmpty() || (encoding != "gzip" && encoding != "deflate")) {
+            return response
+        }
 
-        val decompressedBytes = when (encoding) {
-            "gzip" -> GzipSource(body.source()).buffer().use { it.readByteArray() }
-            "deflate" -> {
+        return try {
+            val decompressedBytes = if (encoding == "gzip") {
+                GzipSource(body.source()).buffer().use { it.readByteArray() }
+            } else {
                 // Read once so we can retry if the server returned raw deflate (RFC 1951) instead
                 // of the zlib-wrapped variant (RFC 1950) that Inflater(nowrap=false) expects.
                 val compressed = body.bytes()
@@ -133,14 +137,16 @@ object NetworkModule {
                         .buffer().use { it.readByteArray() }
                 }
             }
-            else -> return response
-        }
 
-        return response.newBuilder()
-            .removeHeader("Content-Encoding")
-            .removeHeader("Content-Length")
-            .body(decompressedBytes.toResponseBody(body.contentType()))
-            .build()
+            response.newBuilder()
+                .removeHeader("Content-Encoding")
+                .removeHeader("Content-Length")
+                .body(decompressedBytes.toResponseBody(body.contentType()))
+                .build()
+        } finally {
+            // 原 body 已被消费；确保异常路径也关闭，避免连接泄漏。
+            body.close()
+        }
     }
 
     @Provides

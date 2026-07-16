@@ -177,6 +177,20 @@
         android:visibility="gone" />
 
     <TextView
+        android:id="@+id/networkStatusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="56dp"
+        android:background="#CCB00020"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:text="@string/network_lost"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/gestureHintText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

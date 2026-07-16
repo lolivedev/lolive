@@ -2,6 +2,7 @@ package com.ho.lolive.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.ho.lolive.BuildConfig
 import com.ho.lolive.core.common.AppResult
@@ -16,22 +17,25 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    observeRoomsUseCase: ObserveRoomsUseCase,
+    private val observeRoomsUseCase: ObserveRoomsUseCase,
     private val getPlatformsUseCase: GetPlatformsUseCase,
     private val refreshRoomsUseCase: RefreshRoomsUseCase,
     private val checkAppUpdateUseCase: CheckAppUpdateUseCase,
@@ -42,14 +46,23 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val queryState = MutableStateFlow("")
+    private val selectedPlatformTitle = MutableStateFlow<String?>(null)
     private var platformsLoadJob: Job? = null
     private var refreshJob: Job? = null
 
-    val pagedRooms = queryState
-        .debounce(350)
+    val pagedRooms = combine(
+        selectedPlatformTitle,
+        queryState.debounce(350).distinctUntilChanged(),
+    ) { platformTitle, query ->
+        platformTitle to query
+    }
         .distinctUntilChanged()
-        .flatMapLatest { query ->
-            observeRoomsUseCase(query)
+        .flatMapLatest { (platformTitle, query) ->
+            if (platformTitle.isNullOrBlank()) {
+                flowOf(PagingData.empty())
+            } else {
+                observeRoomsUseCase(platformTitle, query)
+            }
         }
         .cachedIn(viewModelScope)
 
@@ -59,8 +72,19 @@ class HomeViewModel @Inject constructor(
                 val previousConnected = _uiState.value.networkConnected
                 _uiState.update { it.copy(networkConnected = connected) }
                 val reconnected = !previousConnected && connected
-                if (reconnected && _uiState.value.platforms.isEmpty()) {
+                if (!reconnected) return@collect
+
+                val state = _uiState.value
+                if (state.platforms.isEmpty()) {
                     loadPlatforms()
+                } else {
+                    // 网络恢复后补刷当前平台房间，避免断网失败后列表一直空着。
+                    val selected = state.platforms.firstOrNull {
+                        it.address == state.selectedPlatformAddress
+                    }
+                    if (selected != null) {
+                        loadRoomsForPlatform(selected)
+                    }
                 }
             }
         }
@@ -78,6 +102,7 @@ class HomeViewModel @Inject constructor(
         if (state.selectedPlatformAddress == address) return
 
         val selected = state.platforms.firstOrNull { it.address == address } ?: return
+        selectedPlatformTitle.value = selected.title
         _uiState.update { it.copy(selectedPlatformAddress = address, errorMessage = null) }
         loadRoomsForPlatform(selected)
     }
@@ -114,8 +139,10 @@ class HomeViewModel @Inject constructor(
                         val onlinePlatforms = result.data.filter { it.onlineCount > 0 }
                         val platforms = onlinePlatforms.ifEmpty { result.data }
                         val preferredAddress = _uiState.value.selectedPlatformAddress
-                        val selected = platforms.firstOrNull { it.address == preferredAddress } ?: platforms.firstOrNull()
+                        val selected = platforms.firstOrNull { it.address == preferredAddress }
+                            ?: platforms.firstOrNull()
 
+                        selectedPlatformTitle.value = selected?.title
                         _uiState.update {
                             it.copy(
                                 platforms = platforms,

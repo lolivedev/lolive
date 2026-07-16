@@ -63,6 +63,7 @@ class DetailActivity : ComponentActivity() {
     private lateinit var controlDock: View
     private lateinit var loadingView: View
     private lateinit var playerErrorText: TextView
+    private lateinit var networkStatusText: TextView
     private lateinit var gestureHintText: TextView
     private lateinit var backButton: ImageButton
     private lateinit var playerTitleText: TextView
@@ -121,6 +122,7 @@ class DetailActivity : ComponentActivity() {
         controlDock = findViewById(R.id.controlDock)
         loadingView = findViewById(R.id.detailLoadingView)
         playerErrorText = findViewById(R.id.playerErrorText)
+        networkStatusText = findViewById(R.id.networkStatusText)
         gestureHintText = findViewById(R.id.gestureHintText)
         backButton = findViewById(R.id.playerBackButton)
         playerTitleText = findViewById(R.id.playerTitleText)
@@ -340,6 +342,11 @@ class DetailActivity : ComponentActivity() {
         }
         fullscreenButton.contentDescription = fullscreenButton.text
 
+        networkStatusText.isVisible = !state.networkConnected
+        if (!state.networkConnected) {
+            networkStatusText.text = getString(R.string.network_lost)
+        }
+
         val room = state.room
         if (room == null) {
             if (state.loading) {
@@ -354,7 +361,9 @@ class DetailActivity : ComponentActivity() {
             updatePauseButton(false)
         } else {
             playerTitleText.text = room.title
-            playerErrorText.isVisible = false
+            if (state.playerErrorMessage == null) {
+                playerErrorText.isVisible = false
+            }
             maybeApplyMedia(room, state.retryToken)
             pauseButton.isEnabled = true
         }

@@ -13,12 +13,15 @@ interface LiveRoomDao {
     @Query(
         """
         SELECT * FROM live_rooms
-        WHERE title LIKE '%' || :query || '%' ESCAPE '\'
-           OR platformTitle LIKE '%' || :query || '%' ESCAPE '\'
+        WHERE platformTitle = :platformTitle
+          AND (
+            :query = ''
+            OR title LIKE '%' || :query || '%' ESCAPE '\'
+          )
         ORDER BY updatedAt DESC
         """,
     )
-    fun pagingSource(query: String): PagingSource<Int, LiveRoomEntity>
+    fun pagingSource(platformTitle: String, query: String): PagingSource<Int, LiveRoomEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(rooms: List<LiveRoomEntity>)

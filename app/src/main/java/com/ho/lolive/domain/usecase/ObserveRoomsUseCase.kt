@@ -9,5 +9,6 @@ import kotlinx.coroutines.flow.Flow
 class ObserveRoomsUseCase @Inject constructor(
     private val repository: LiveRepository,
 ) {
-    operator fun invoke(query: String): Flow<PagingData<LiveRoom>> = repository.observePagedRooms(query)
+    operator fun invoke(platformTitle: String, query: String): Flow<PagingData<LiveRoom>> =
+        repository.observePagedRooms(platformTitle, query)
 }

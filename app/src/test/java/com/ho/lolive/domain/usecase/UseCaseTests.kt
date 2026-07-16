@@ -3,6 +3,7 @@ package com.ho.lolive.domain.usecase
 import androidx.paging.PagingData
 import com.google.common.truth.Truth.assertThat
 import com.ho.lolive.core.common.AppResult
+import com.ho.lolive.domain.model.AppUpdateInfo
 import com.ho.lolive.domain.model.LivePlatform
 import com.ho.lolive.domain.model.LiveRoom
 import com.ho.lolive.domain.model.LiveRoomDetail
@@ -71,7 +72,8 @@ private class FakeLiveRepository(
     private val refreshResult: AppResult<Unit> = AppResult.Success(Unit),
     private val detailResult: AppResult<LiveRoomDetail> = AppResult.Error(Throwable("missing")),
 ) : LiveRepository {
-    override fun observePagedRooms(query: String): Flow<PagingData<LiveRoom>> = flowOf(PagingData.empty())
+    override fun observePagedRooms(platformTitle: String, query: String): Flow<PagingData<LiveRoom>> =
+        flowOf(PagingData.empty())
 
     override suspend fun getPlatforms(): AppResult<List<LivePlatform>> = platformsResult
 

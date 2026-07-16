@@ -9,7 +9,7 @@ import com.ho.lolive.domain.model.LiveRoomDetail
 import kotlinx.coroutines.flow.Flow
 
 interface LiveRepository {
-    fun observePagedRooms(query: String): Flow<PagingData<LiveRoom>>
+    fun observePagedRooms(platformTitle: String, query: String): Flow<PagingData<LiveRoom>>
     suspend fun getPlatforms(): AppResult<List<LivePlatform>>
     suspend fun refreshRooms(platform: LivePlatform): AppResult<Unit>
     suspend fun getRoomDetail(roomId: String): AppResult<LiveRoomDetail>
