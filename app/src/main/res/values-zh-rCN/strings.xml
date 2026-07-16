@@ -18,7 +18,7 @@
     <string name="select_platform">选择平台</string>
     <string name="select_platform_hint">点击切换选择平台并加载直播</string>
     <string name="selected">已选中</string>
-    <string name="swipe_hint">左滑切换上一个直播，右滑切换下一个直播</string>
+    <string name="swipe_hint">左滑切换下一个直播，右滑切换上一个直播</string>
     <string name="brightness_percent">亮度 %1$d%%</string>
     <string name="volume_percent">音量 %1$d%%</string>
     <string name="resolution_auto">自动</string>

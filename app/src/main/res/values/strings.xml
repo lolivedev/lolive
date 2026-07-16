@@ -17,7 +17,7 @@
     <string name="select_platform">Select Platform</string>
     <string name="select_platform_hint">Tap switch to choose and load rooms</string>
     <string name="selected">Selected</string>
-    <string name="swipe_hint">Swipe left for previous room, swipe right for next room</string>
+    <string name="swipe_hint">Swipe left for next room, swipe right for previous room</string>
     <string name="brightness_percent">Brightness %1$d%%</string>
     <string name="volume_percent">Volume %1$d%%</string>
     <string name="resolution_auto">Auto</string>

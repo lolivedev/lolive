@@ -38,8 +38,8 @@ interface LiveRoomDao {
     @Query(
         """
         SELECT id FROM live_rooms
-        WHERE platformTitle = :platformTitle AND updatedAt < :currentUpdatedAt
-        ORDER BY updatedAt DESC, title COLLATE NOCASE ASC
+        WHERE platformTitle = :platformTitle AND updatedAt > :currentUpdatedAt
+        ORDER BY updatedAt ASC, title COLLATE NOCASE ASC
         LIMIT 1
         """,
     )
@@ -48,8 +48,8 @@ interface LiveRoomDao {
     @Query(
         """
         SELECT id FROM live_rooms
-        WHERE platformTitle = :platformTitle AND updatedAt > :currentUpdatedAt
-        ORDER BY updatedAt ASC, title COLLATE NOCASE ASC
+        WHERE platformTitle = :platformTitle AND updatedAt < :currentUpdatedAt
+        ORDER BY updatedAt DESC, title COLLATE NOCASE ASC
         LIMIT 1
         """,
     )
